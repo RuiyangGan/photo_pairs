@@ -1,0 +1,25 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1539378119267.000,
+    "dirty" : true,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "2801758685",
+    "id" : "26B3272A",
+    "lastKnownWriteTime" : 1539378529,
+    "last_content_update" : 1539378629579,
+    "path" : "C:/Users/ganru/Desktop/Study/FA 18/36-611/photo_pairs/Clustering_Gaussian_Ming.Rmd",
+    "project_path" : "Clustering_Gaussian_Ming.Rmd",
+    "properties" : {
+        "cursorPosition" : "28,15",
+        "scrollLine" : "21"
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 9,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_markdown"
+}

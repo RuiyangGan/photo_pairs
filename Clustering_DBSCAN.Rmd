@@ -1,0 +1,70 @@
+---
+title: "Sosie_spectral_clustering"
+author: "Ruiayng Gan"
+date: "10/12/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(dbscan)
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Sosie Query
+```{}
+SELECT TOP 50000
+   p.objid,p.ra,p.dec,p.u,p.g,p.r,p.i,p.z,
+   p.cModelMag_u as c_u, p.cModelMag_g as c_g, cModelMag_r c_r,
+   p.cModelMag_i as c_i, p.cModelMag_z as c_z,
+   p.deVAB_u, p.deVAB_r, p.deVAB_i, p.deVAB_z, 
+   p.deVAB_g,
+   p.expAB_u, p.expAB_g, p.expAB_r, p.expAB_i,
+   p.expAB_z,
+   s.specobjid, s.class, s.z as redshift
+FROM PhotoObj AS p
+   JOIN SpecObj AS s ON s.bestobjid = p.objid
+WHERE 
+   s.z BETWEEN 0 AND 10
+   and s.class = "GALAXY"
+```
+
+
+# A small Scale expriment: n = 2000
+```{r}
+# read the data
+dat_2000 <- read.csv("Photo_pairs.csv", header = TRUE)
+dat_2000.features <- data.frame(dat_2000$redshift, dat_2000[,c("g","r","i","z")]/dat_2000$u)
+# Normalize data matrix to have the same variance
+dat_2000.features <- scale(dat_2000.features, scale=TRUE)
+
+# I try different radius of the neighborhood and found out 0.05
+# to be a good parameter as almost all groups have 
+rslt_2000 <- dbscan(dat_2000.features, minPts=2, eps = .05)
+rslt_2000
+
+```
+
+
+# A large scale experiment: n = 50,000
+Since we have large sample here, I will include features such as B/A ratio
+```{r}
+# preprocess features columns to be selected
+dat_large <- read.csv("Photo_pairs_50000.csv", header = TRUE, skip=1)
+
+dat_large.features.cmag <- dat_large[c("c_g","c_r","c_i","c_z")]/dat_large$u
+dat_large.features.deVAB <- dat_large[,colnames(dat_large) %in% c("deVAB_g","deVAB_r","deVAB_i","deVAB_z")]/dat_large$deVAB_u
+#dat_large.features.expAB <- dat_large[,colnames(dat_large) %in% c("expAB_g","expAB_r","expAB_i","expAB_z")]/dat_large$expAB_u
+dat_large.features <- data.frame(dat_large$redshift, dat_large.features.mag)
+
+
+# Normalize feature matrix to have the same sample variance
+dat_large.features <- scale(dat_large.features, scale=TRUE)
+
+# I try different radius of the neighborhood and found out .05
+# to be a good parameter as almost all groups have 
+rslt_large <- hdbscan(dat_large.features, minPts=2)
+rslt_large
+```
+
+
