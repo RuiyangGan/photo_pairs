@@ -1,5 +1,5 @@
 ---
-title: "Grouping Sosie based on photometric data"
+title: "Grouping galaxy based on photometric data"
 author: "Ruiyang Gan"
 date: "10/13/2018"
 output: html_document
@@ -10,7 +10,12 @@ knitr::opts_chunk$set(echo = FALSE)
 library(knitr)
 ```
 
-# Sosie Query
+# Introduction
+This report focuses on classifying galaxies with similar redshift into small groups with group size $\leq$ 10 but $\geq$ 2 (sosie pairs). To reach the goal, we will use a tree-like model: First we classfy galaxies into different groups based on their redshifts (as sosie pairs should not be too far away from each other). Next, we will use a density based, nearest-neighbor search based on normalized color magnitudes to search for sosie pairs within the groups that are classified to have similar redshifts. 
+
+
+# A small scale Experiment
+Sosie query used in the data set
 ```{}
 SELECT TOP 2000
    p.objid,p.ra,p.dec,p.u,p.g,p.r,p.i,p.z,
@@ -29,24 +34,172 @@ WHERE
 ```
 
 ```{r prelim, include=FALSE}
+# Load the csv file into data and 
 dat_small <- read.csv("Photo_pairs.csv", header = TRUE, skip = 1)
 library(mclust)
+library(dbscan)
 ```
 
-# One dimensional classification of galaxies based on redshift
-```{r fig.height = 8, fig.width = 14, echo=FALSE}
-dat_small.sub = subset(dat_small, select=c("redshift"))
+## One dimensional classification of galaxies based on redshift
+```{r echo=FALSE}
+dat_small.redShift <- subset(dat_small, select=c("redshift"))
 
-# Fit a 
-BIC <- mclustBIC(dat_small.sub)
+# Fit Gaussian Mixture model on the redshift using BIC 
+# to select the optimal number of groups for gaussian mixture
+BIC <- mclustBIC(dat_small.redShift)
 plot(BIC)
-mod1 <- Mclust(dat_small.sub, x = BIC)
-summary(mod1)
+mod1 <- Mclust(dat_small.redShift, x = BIC)
 redshiftGroup <- mod1$classification
-par(mfrow = c(2,3))
-sapply(1:length(table(redshiftGroup)), function(d) {
-	  hist(dat_small$redshift[], 
-	  		 main = paste0("Histogram of galaxies' redshift within group",d),
-	  		 xlab = "Red shift")
-	})
+total.redShiftGroups <- length(table(redshiftGroup))
 ```
+
+```{r fig.height = 8, fig.width = 14, }
+# Display the distribution of redshift within each group
+par(mfrow = c(ceiling(total.redShiftGroups/3), 3))
+invisible(sapply(1:length(table(redshiftGroup)), function(d) {
+	  hist(dat_small$redshift[redshiftGroup == d], 
+	  		 main = paste("Histogram of galaxies' redshift within group",d),
+	  		 xlab = "Red shift")
+	}))
+
+# Add the redshift group label to the original data.frame
+dat_small <- data.frame(dat_small, "redShiftLabel" = redshiftGroup)
+
+```
+
+## Finding galaxy pairs with similar redshifts based on color magnitudes
+After we obtain the preliminary grouping of galaxies based on their redshifts, we will find pairs within these groups. To accomplish the goal, we will use DBSCAN (a nearest-neghbor-searching approach) to find galaxy pairs.
+
+```{r}
+# Extract the magnitudes of color bands u,g,r,i,z we will use to classify galaxies into pairs
+dat_small.cMag <- subset(dat_small, select=c("c_u","c_g","c_r","c_i","c_z"))
+
+cMagGroup <- sapply(1:length(table(redshiftGroup)), function(d) {
+	# Select the group with same redshift labelling
+	dat_small.cMag.d <- dat_small.cMag[redshiftGroup == d,]
+	# Normalize magnitude with respect to u's magnitude
+	dat_small.cMag.d <- dat_small.cMag.d[,2:5]/dat_small.cMag.d[,1]
+	
+	# Scale the normalized magnitude to have unit variance
+	dat_small.cMag.d <- scale(dat_small.cMag.d)
+	
+	# Run DBSCAN to find the sosie pairs within groups classified by the 
+	# magnitude of the four color bands
+	# The minPts (number of points required for a point to become a core point)
+	# is set to 2 since we are looking for pairs
+	# Since the color magnitude has been scaled to unit variance, therefore I will
+	# use .05 as the radius. 
+	# A better approach here would be using a hierachial model without using a fixed 
+	# radius. Scaled magnitude to have unit variance allow us to choose the 
+	# However, for large datasets, such hierarchial model will take up large 
+	# memory space and become computationally difficult. 
+	rslt.d <- dbscan(dat_small.cMag.d, minPts = 2, eps = .05)
+	return(rslt.d$cluster)
+	})
+
+# Attach the magnitude grouping to the original data.frame
+dat_small <- data.frame(dat_small, "cMagLabel" = numeric(nrow(dat_small)))
+for(d in 1:length(table(redshiftGroup))) {
+	dat_small$cMagLabel[dat_small$redShiftLabel == d] <- cMagGroup[[d]]
+}
+```
+
+Now that we have found the clustering based on the redshift and normalized (w.r.t magnitude of u) and magnitude, we will see if these groups have similar pattern in color magnitudes according to barplots of color magnitude
+```{r fig.height = 10, fig.width = 20, echo=FALSE}
+# Within groups with similar redshift, we can randomly select groups with the 
+# same color magnitude labeling and plot their color magnitude of u,g,r,i,z 
+par(mfrow = c(ceiling(total.redShiftGroups/3), 3))
+for(d in 1:length(table(redshiftGroup))){
+	# Randomly select a pair with the same cMag label within the group
+	# with same redshift label, ignore noise group
+	cMag.level.random <- sample(unique(cMagGroup[[d]])[-1],1)
+	pairs.row <- (dat_small$redShiftLabel==d) & (dat_small$cMagLabel == cMag.level.random)
+	sosie <- subset(dat_small[pairs.row,], select=c("c_u","c_g","c_r","c_i","c_z"))
+	sosie <- as.matrix(sosie)
+	barplot(t(sosie), beside = TRUE, 
+					main = paste("Color Magnitude of randomly selected sosies with redshift labeling",d),
+					xlab = "Observation", ylab = "Magnitude")
+}
+```
+
+From the above side-by-side barplots, we observe the selected pairs all have similar color magnitude pattern.
+
+# Large scale data set experiment
+Now, we will scale the size of our data set to  50,000. 
+```{r fig.height = 10, fig.width = 20, echo=FALSE}
+# Read in the large scale data 
+dat_large <- read.csv("Photo_pairs_100000.csv", header = TRUE, skip=1)
+
+# Classify data based on the redshift using gaussian mixture
+dat_large.redShift <- subset(dat_large, select=c("redshift"))
+
+# Fit Gaussian Mixture model on the redshift using BIC 
+# to select the optimal number of groups for gaussian mixture
+BIC <- mclustBIC(dat_large.redShift)
+plot(BIC)
+mod1 <- Mclust(dat_large.redShift, x = BIC)
+redshiftGroup <- mod1$classification
+total.redShiftGroups <- length(table(redshiftGroup))
+# Display the distribution of redshift within each group
+par(mfrow = c(ceiling(total.redShiftGroups/3), 3))
+invisible(sapply(1:length(table(redshiftGroup)), function(d) {
+	  hist(dat_large$redshift[redshiftGroup == d], 
+	  		 main = paste("Histogram of galaxies' redshift within group",d),
+	  		 xlab = "Red shift")
+	}))
+
+# Add the redshift group label to the original data.frame
+dat_large <- data.frame(dat_large, "redShiftLabel" = redshiftGroup)
+
+
+```
+
+```{r }
+# within each group, use DBSCAN to find paris
+dat_large.cMag <- subset(dat_large, select=c("c_u","c_g","c_r","c_i","c_z"))
+dat_large.AB <- subset(dat_large, select=c("deVAB_u", "deVAB_r", "deVAB_i", "deVAB_z", 
+   "deVAB_g"))
+
+cMag_AB_Group <- sapply(1:length(table(redshiftGroup)), function(d) {
+	# Select the group with same redshift labelling
+	dat_large.cMag.d <- dat_large.cMag[redshiftGroup == d,]
+	# Normalize magnitude with respect to u's magnitude
+	dat_large.cMag.d <- dat_large.cMag.d[,2:5]/dat_large.cMag.d[,1]
+	
+	# add in the A/B ratio to classify the groups 
+	dat_large.AB.d <- dat_large.AB[redshiftGroup == d,]
+	dat_large.feature.d <- data.frame(dat_large.cMag.d, dat_large.AB.d)
+	# Scale the normalized magnitude to have unit variance
+	dat_large.feature.d <- scale(dat_large.feature.d)
+	rslt.d <- dbscan(dat_large.feature.d, minPts = 2, eps = .05)
+	return(rslt.d$cluster)
+	})
+
+# Attach the magnitude grouping to the original data.frame
+dat_large <- data.frame(dat_large, "cMag_AB_Label" = numeric(nrow(dat_large)))
+for(d in 1:length(table(redshiftGroup))) {
+	dat_large$cMag_AB_Label[dat_large$redShiftLabel == d] <- cMag_AB_Group[[d]]
+}
+```
+
+```{r echo=FALSE, fig.width = 18, fig.height=18}
+# Within groups with similar redshift, we can randomly select groups with the 
+# same color magnitude labeling and plot their color magnitude of u,g,r,i,z 
+par(mfrow = c(ceiling(total.redShiftGroups/3), 3))
+for(d in 1:length(table(redshiftGroup))){
+	# Randomly select a pair with the same cMag label within the group
+	# with same redshift label
+	cMagAB.level.random <- sample(unique(cMag_AB_Group[[d]]),1)
+	pairs.row <- (dat_large$redShiftLabel==d) & (dat_large$cMag_AB_Label == cMagAB.level.random)
+	sosie <- subset(dat_large[pairs.row,], select=c("c_u","c_g","c_r","c_i","c_z"))
+	sosie <- as.matrix(sosie)
+	barplot(t(sosie), beside = TRUE, 
+					main = paste("Color Magnitude of randomly selected sosies with redshift labeling",d),
+					xlab = "Observation", ylab = "Magnitude")
+}
+```
+
+```{r}
+
+```
+
