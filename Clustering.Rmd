@@ -203,3 +203,23 @@ for(d in 1:length(table(redshiftGroup))){
 
 ```
 
+
+Now that we have found the clustering based on the redshift and normalized (w.r.t magnitude of u) and magnitude, we will see if these groups have similar pattern in color magnitudes according to barplots of color magnitude
+```{r fig.height = 10, fig.width = 20, echo=FALSE, dpi = 300}
+# Within groups with similar redshift, we can randomly select groups with the 
+# same color magnitude labeling and plot their color magnitude of u,g,r,i,z 
+par(mfrow = c(ceiling(total.redShiftGroups/3), 3))
+for(d in 1:length(table(redshiftGroup))){
+	# Randomly select a group and plot their color magnitude side by side
+	cMag.level.random <- sample(unique(cMagGroup[[d]])[-1],1)
+	pairs.row <- (dat_small$redShiftLabel==d) & (dat_small$cMagLabel == cMag.level.random)
+	sosie <- subset(dat_small[pairs.row,], select=c("c_u","c_g","c_r","c_i","c_z"))
+	sosie <- as.matrix(sosie)
+	barplot(t(sosie), beside = TRUE, 
+					main = paste("Color Magnitude of randomly selected sosies with redshift labeling",d),
+					xlab = "Observation", ylab = "Magnitude")
+}
+```
+
+
+# Large data set experiment
