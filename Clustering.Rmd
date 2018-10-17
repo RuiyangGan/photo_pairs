@@ -213,8 +213,8 @@ for(d in sort(unique(dat_small$redShiftLabel))){
 
 From the above plot showing the magnitude versus the wavelength for each sosie pairs, we notice that the clustering algorithm has found pairs of galaxies that has similar magnitude function, except they have differnet intensity of the light (in the plot, the two curve has similar shape but different intercept). Notice that in some plot, we have very many lines overlaid in the same plot but with significantly different magnitude pattern. It doesn't mean that they are sosie pairs, they are just classified as noise by DBSCAN. 
 
-# Next step
-To proceed from t
+# Question and idea for next step
+For now, we only perform pairs finding on a small data set using only redshift and normalized composite color magnitude. To proceed from here, we can add in the AB ratio of each color band in our feature space and perform clustering. AB ratio provides us with information about shape of the galaxy, as it captures shape of an elliptical galaxy. We can further filter by color band and calculate AB ratio for each color band. However, adding AB ratio will also increase the dimension in our feature space. Then the use of euclidean metric will demise the clustering algorithm due to the infamous curse of dimensionality. Thus, we can try different metric in our clustering algorithm, such as using infinite-norm as our metric or use a weighted metric. Another solution will be using a hierarchial classification model.
 
 ## Appendix: Computer code :
 
