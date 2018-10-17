@@ -1,8 +1,10 @@
 ---
 title: "Grouping galaxy based on photometric data"
 author: "Ruiyang Gan, Steve Han, Mingwei Huang, Soyoung Lee, Yifan Len"
-date: "10/13/2018"
-output: html_document
+date: "10/17/2018"
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -14,73 +16,12 @@ library(knitr)
 This report focuses on classifying galaxies with similar redshift into small groups with group size $\leq$ 10 but $\geq$ 2 (sosie pairs). To reach the goal, we will use a tree-like model: First we classfy galaxies into different groups based on their redshifts (as sosie pairs should not be too far away from each other). Next, we will use a density based, nearest-neighbor search based on normalized color magnitudes to search for sosie pairs within the groups that are classified to have similar redshifts. ( _Note_ : The notion of _density_ is just describing how densely the points (galaxies) are clustered together, not to be confused with notion of _probability density_ in probability and statistics).
 
 
-# A small scale Experiment
-Sosie query used in the data set
-```{}
-SELECT TOP 2000
-   p.objid,p.ra,p.dec,p.u,p.g,p.r,p.i,p.z,
-   p.cModelMag_u as c_u, p.cModelMag_g as c_g, cModelMag_r as c_r,
-   p.cModelMag_i as c_i, p.cModelMag_z as c_z,
-   p.deVAB_u, p.deVAB_r, p.deVAB_i, p.deVAB_z, 
-   p.deVAB_g,
-   p.expAB_u, p.expAB_g, p.expAB_r, p.expAB_i,
-   p.expAB_z,
-   s.specobjid, s.class, s.z as redshift
-FROM PhotoObj AS p
-   JOIN SpecObj AS s ON s.bestobjid = p.objid
-WHERE 
-   s.z BETWEEN 0 AND 10
-   and s.class = "GALAXY"
-```
-
 ```{r prelim, include=FALSE}
 # Load the csv file into data and 
 dat_small <- read.csv("Photo_pairs.csv", header = TRUE, skip = 1)
 dat_small <- dat_small[-which(dat_small$redshift>1.2),]
 library(dbscan)
 ```
-
-## Apply dbscan clustering on our simulated data (prelabled because we created them)
-
-```{r, eval = FALSE}
-# Read our simulated data 
-sim_data = read.csv("sim_data.csv")
-
-
-cluster_dbscan <- function(data, eps_val){
-  
-  data.cMag <- subset(data, select=c("c_u","c_g","c_r","c_i","c_z"))
-	# Normalize magnitude with respect to u's magnitude
-	
-  data.cMag <- data.cMag[,2:5]/data.cMag[,1]
-	
-	# Scale the normalized magnitude to have unit variance
-	data.cMag <- scale(data.cMag)
-	
-	# Run DBSCAN to find the sosie pairs within groups classified by the 
-	# magnitude of the four color bands
-	# The minPts (number of points required for a point to become a core point)
-	# is set to 2 since we are looking for pairs
-	rslt <- dbscan(data.cMag, minPts = 2, eps = eps_val)
-
-	return(rslt$cluster)
-}
-
-
-data.cMag <- subset(sim_data, select=c("c_u","c_g","c_r","c_i","c_z"))
-
-matplot(t(data.cMag), type ="l", x = c(3543,4770,6231,7625,9134),
-					main = "Magnitude vs. Wavelength ",
-					xlab = "wavelength in Angstroms", ylab = "Magnitude")
-
-# Attach the magnitude grouping to the original data.frame
-sim_data$dbscanLabel =cluster_dbscan(sim_data, .5)
-table(sim_data$label, sim_data$dbscanLabel)
-
-
-
-```
-
 
 ## One dimensional grouping of galaxies based on redshift (a crude measure of distance)
 
@@ -139,9 +80,80 @@ invisible(sapply(sort(unique(dat_small$redShiftLabel)), function(d) {
 ```
 
 ## Finding galaxy pairs with similar redshifts based on color magnitudes
-After we obtain the preliminary grouping of galaxies based on their redshifts, we will find pairs within these groups. To accomplish the goal, we will use DBSCAN (a nearest-neghbor-searching approach) to find galaxy pairs.
+After we obtain the preliminary grouping of galaxies based on their redshifts, we will find pairs within these groups. To accomplish the goal, we will use DBSCAN (a nearest-neghbor-searching approach) to find galaxy pairs based on magnitude of color that has been normalized with respect to its .
 
-The principle of DBSCAN is a clustering method that is analagous to finding a "closest-pair" for a galaxy. THe concept builds around the notion of *core points* and *radius $\epsilon$*. A point x is said to be a *core point* if it has at least *minPts* points (including x itself) within its neighborhood *B($x,\epsilon$)*. Points x and y are said to be *connected* if $d(x,y) \leq 2\epsilon$, i.e. $B()$, It also introduces the notion of noise. if Thus, there are two parameters in DBSCAN for us to specify: *eps* and *minPts*.
+Before we dive into clustering algorithm, we will explain the features we use to cluster the galaxies. Usually, flux emiited by galaxies varies in both magnitude/intensity and the pattern of light they are emitting. Visually, magnitude/intensity represents how bright these lights are, while the pattern of light directly links to the color of the galaxy.  
+
+
+The principle of DBSCAN is a clustering method that is analagous to finding a "closest-pair" for a galaxy. THe concept builds around the notion of *core points* and *radius $\epsilon$*. A point x is said to be a *core point* if it has at least *minPts* points (including x itself) within its neighborhood *B($x,\epsilon$)*. Points x and y are said to be *connected* if $d(x,y) \leq 2\epsilon$, i.e. B(x,$\epsilon$) $\cap$ B(y,$\epsilon$) $\neq \emptyset$. If a point is not connected to any core point, then this point is regarded as a point, a point not in any "meaningful" cluster.
+
+To find pair of points (or small group of points), we will need to let minPts, minimal number of points in core point's neighborhood, be 2. ( _Note_: minPts is not equivalent to the number of points found in a cluster, but it sets lower bound for the number of points in a cluster). 
+At the same time, we will let the radius of the neighborhood, $\epsilon$, also be sufficiently small, as we need sosies to be nearly identical to each other. 
+
+Now, we will need to specify the specific value of the two parameters eps and minPts. For minPts, we can set it to 2, as the lowest number of points in a sosie pair has to be 2. Since we have normalized and scaled our composite magnitude of color band g,r,i,z, we can choose a fixed radius for our eps here. Due to the low complextiy of DBSCAN, an empirical approach here would be running the scanning multiple times and looking 
+
+Another important setting for DBSCAN is to determine what metric $d(\cdot)$ we use to define $\epsilon$ and its induced neighborhood. The justification of using a euclidean metric is very tricky. In the original paper of DBSCAN, they use euclidean metric as their measure of distance. Since they only discuss clustering in a 2-dimensional space, using euclidean metric is a natural choice. However, we are clustering small groups based on more than 3 features (4 normalized color magnitude and AB ratio of each color bands in full model), using Euclidean metric may not be a very good choice here. However, using a euclidean metric in our small scale experiment (where we only use composite color magnitude normalized with respect to composite manitude of color band u). 
+
+## Apply dbscan clustering on our simulated data (prelabled because we created them)
+
+```{r, eval = FALSE}
+# Read our simulated data 
+sim_data = read.csv("sim_data.csv")
+
+
+cluster_dbscan <- function(data, eps_val){
+  
+  data.cMag <- subset(data, select=c("c_u","c_g","c_r","c_i","c_z"))
+	# Normalize magnitude with respect to u's magnitude
+	
+  data.cMag <- data.cMag[,2:5]/data.cMag[,1]
+	
+	# Scale the normalized magnitude to have unit variance
+	data.cMag <- scale(data.cMag)
+	
+	# Run DBSCAN to find the sosie pairs within groups classified by the 
+	# magnitude of the four color bands
+	# The minPts (number of points required for a point to become a core point)
+	# is set to 2 since we are looking for pairs
+	rslt <- dbscan(data.cMag, minPts = 2, eps = eps_val)
+
+	return(rslt$cluster)
+}
+
+
+data.cMag <- subset(sim_data, select=c("c_u","c_g","c_r","c_i","c_z"))
+
+matplot(t(data.cMag), type ="l", x = c(3543,4770,6231,7625,9134),
+					main = "Magnitude vs. Wavelength ",
+					xlab = "wavelength in Angstroms", ylab = "Magnitude")
+
+# Attach the magnitude grouping to the original data.frame
+sim_data$dbscanLabel =cluster_dbscan(sim_data, .5)
+table(sim_data$label, sim_data$dbscanLabel)
+
+
+
+```
+
+
+# A small scale Experiment
+Sosie query used in the data set
+```{}
+SELECT TOP 2000
+   p.objid,p.ra,p.dec,p.u,p.g,p.r,p.i,p.z,
+   p.cModelMag_u as c_u, p.cModelMag_g as c_g, cModelMag_r as c_r,
+   p.cModelMag_i as c_i, p.cModelMag_z as c_z,
+   p.deVAB_u, p.deVAB_r, p.deVAB_i, p.deVAB_z, 
+   p.deVAB_g,
+   p.expAB_u, p.expAB_g, p.expAB_r, p.expAB_i,
+   p.expAB_z,
+   s.specobjid, s.class, s.z as redshift
+FROM PhotoObj AS p
+   JOIN SpecObj AS s ON s.bestobjid = p.objid
+WHERE 
+   s.z BETWEEN 0 AND 10
+   and s.class = "GALAXY"
+```
 
 ```{r}
 # Extract the magnitudes of color bands u,g,r,i,z we will use to classify galaxies into pairs
