@@ -1,6 +1,6 @@
 ---
 title: "Grouping galaxy based on photometric data"
-author: "Ruiyang Gan, Steve Han, Mingwei Huang, Soyoung Lee, Yifan Len"
+author: "Ruiyang Gan, Steve Han, Mingwei Huang, Soyoung Lee, Yifan Leng"
 date: "10/17/2018"
 output:
   pdf_document: default
@@ -80,9 +80,9 @@ invisible(sapply(sort(unique(dat_small$redShiftLabel)), function(d) {
 ```
 
 ## Finding galaxy pairs with similar redshifts based on color magnitudes
-After we obtain the preliminary grouping of galaxies based on their redshifts, we will find pairs within these groups. To accomplish the goal, we will use DBSCAN (a nearest-neghbor-searching approach) to find galaxy pairs based on magnitude of color that has been normalized with respect to its .
+After we obtain the preliminary grouping of galaxies based on their redshifts, we will find pairs within these groups. To accomplish the goal, we will use DBSCAN (a nearest-neghbor-searching approach) to find galaxy pairs based on magnitude of color that has been normalized with respect to its composite color magnitude of u.
 
-Before we dive into clustering algorithm, we will explain the features we use to cluster the galaxies. Usually, flux emiited by galaxies varies in both magnitude/intensity and the pattern of light they are emitting. Visually, magnitude/intensity represents how bright these lights are, while the pattern of light directly links to the color of the galaxy.  
+Before we dive into the actual clustering algorithm, we will explain the features we use to cluster the galaxies. Usually, flux emiited by galaxies varies in both magnitude/intensity and the pattern of light they are emitting. Visually, magnitude/intensity represents how bright these lights are, while the pattern of light directly links to the color of the galaxy. Now, imagine that we have two "identical galaxy" (emitting same color with same level of brightness), but one is slightly further away from us. Therefore, the brightness/magnitude level in each color band will be different, but the magnitude ratio will be the same (as they are emitting same kind of light). Suppose we directly use the raw color magnitude to classify the galaxies, we will lose the pair. But if we normalize the magnitude in each color band with respect to magnitude of one color band, the two galaxies will have the same normalized color magnitude. For later experiement, we will use the composite color magnitude of g,r,i,z normalized with respect to the composite color magnitude of u.
 
 
 The principle of DBSCAN is a clustering method that is analagous to finding a "closest-pair" for a galaxy. THe concept builds around the notion of *core points* and *radius $\epsilon$*. A point x is said to be a *core point* if it has at least *minPts* points (including x itself) within its neighborhood *B($x,\epsilon$)*. Points x and y are said to be *connected* if $d(x,y) \leq 2\epsilon$, i.e. B(x,$\epsilon$) $\cap$ B(y,$\epsilon$) $\neq \emptyset$. If a point is not connected to any core point, then this point is regarded as a point, a point not in any "meaningful" cluster.
@@ -90,7 +90,7 @@ The principle of DBSCAN is a clustering method that is analagous to finding a "c
 To find pair of points (or small group of points), we will need to let minPts, minimal number of points in core point's neighborhood, be 2. ( _Note_: minPts is not equivalent to the number of points found in a cluster, but it sets lower bound for the number of points in a cluster). 
 At the same time, we will let the radius of the neighborhood, $\epsilon$, also be sufficiently small, as we need sosies to be nearly identical to each other. 
 
-Now, we will need to specify the specific value of the two parameters eps and minPts. For minPts, we can set it to 2, as the lowest number of points in a sosie pair has to be 2. Since we have normalized and scaled our composite magnitude of color band g,r,i,z, we can choose a fixed radius for our eps here. Due to the low complextiy of DBSCAN, an empirical approach here would be running the scanning multiple times and looking 
+Now, we will need to specify the specific value of the two parameters eps and minPts. For minPts, we can set it to 2, as the lowest number of points in a sosie pair has to be 2. Since we have normalized and scaled our composite magnitude of color band g,r,i,z, we can choose a fixed radius for our eps here. Due to the low complextiy of DBSCAN, an empirical approach here would be running the clustering algorithm multiple times and finding the appropriate eps. (A better approach here might be using hdbscan, which only requires setting minPts)
 
 Another important setting for DBSCAN is to determine what metric $d(\cdot)$ we use to define $\epsilon$ and its induced neighborhood. The justification of using a euclidean metric is very tricky. In the original paper of DBSCAN, they use euclidean metric as their measure of distance. Since they only discuss clustering in a 2-dimensional space, using euclidean metric is a natural choice. However, we are clustering small groups based on more than 3 features (4 normalized color magnitude and AB ratio of each color bands in full model), using Euclidean metric may not be a very good choice here. However, using a euclidean metric in our small scale experiment (where we only use composite color magnitude normalized with respect to composite manitude of color band u). 
 
@@ -213,6 +213,8 @@ for(d in sort(unique(dat_small$redShiftLabel))){
 
 From the above plot showing the magnitude versus the wavelength for each sosie pairs, we notice that the clustering algorithm has found pairs of galaxies that has similar magnitude function, except they have differnet intensity of the light (in the plot, the two curve has similar shape but different intercept). Notice that in some plot, we have very many lines overlaid in the same plot but with significantly different magnitude pattern. It doesn't mean that they are sosie pairs, they are just classified as noise by DBSCAN. 
 
+# Next step
+To proceed from t
 
 ## Appendix: Computer code :
 
