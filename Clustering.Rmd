@@ -3,8 +3,8 @@ title: "Grouping galaxy based on photometric data"
 author: "Ruiyang Gan, Steve Han, Mingwei Huang, Soyoung Lee, Yifan Leng"
 date: "10/17/2018"
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -96,7 +96,7 @@ Another important setting for DBSCAN is to determine what metric $d(\cdot)$ we u
 
 ## Apply dbscan clustering on our simulated data (prelabled because we created them)
 
-```{r, eval = FALSE}
+```{r}
 # Read our simulated data 
 sim_data = read.csv("sim_data.csv")
 
@@ -127,13 +127,20 @@ matplot(t(data.cMag), type ="l", x = c(3543,4770,6231,7625,9134),
 					main = "Magnitude vs. Wavelength ",
 					xlab = "wavelength in Angstroms", ylab = "Magnitude")
 
+```
+
+We simulated three Sosie groups, and each sosie group has three galaxies. We plot the galaxies' simulated magnitude against wavelength, and the Sosie galaxies should have the same shape but different shift. 
+
+
+```{r}
+
 # Attach the magnitude grouping to the original data.frame
 sim_data$dbscanLabel =cluster_dbscan(sim_data, .5)
 table(sim_data$label, sim_data$dbscanLabel)
-
-
-
 ```
+
+We then run DBSCAN clustering algarithms on our simulated data, and the galaxies are perfectly clustered. The result in shown in the table above. 
+
 
 
 # A small scale Experiment
@@ -154,6 +161,29 @@ WHERE
    s.z BETWEEN 0 AND 10
    and s.class = "GALAXY"
 ```
+
+We use the following features from the `PhotoObj` and `SpecObj` in SDSS databse to cluster galaxies with similar colors and distance. The features we used for cluster on distance and color magnitudes are defined bwlow: 
+
+`z`: Best redshift when excluding QSO fit in BOSS spectra (right redshift to use for galaxy targets). It is our crude estimate of a galaxy's distance from earth. 
+
+The features we used to clutser galaxies based on its emitted color bands are defined in the following:
+
+`cModelMag_u`: Composite Model Magnitude of ultravolet defined as $$F_{composite} = \text{fracDeV} * F_{deV} + (1-\text{fracDev}) * F_{exp}$$ where The coefficient (clipped between zero and one) of the de Vaucouleurs term is stored in the quantity fracDeV. FdeV and Fexp are the de Vaucouleurs and exponential fluxes (not magnitudes) of the object in question. 
+
+`cModelMag_g`: Composite Model Magnitude of green band.
+
+`cModelMag_r`: Composite Model Magnitude of red band.
+
+`cModelMag_i`: Composite Model Magnitude of near infrared band.
+
+`cModelMag_z`: Composite Model Magnitude of infrared band.
+
+The feature we will use in the next step to futher clutser similar-distance-and-color galaxies with similiar shapes is defined below:
+
+`deVAB_u`, `deVAB_g`, `deVAB_r`, `deVAB_i`, `deVAB_z`: elliptical version of de Vaucouleurs defined on the AB axis ratio in five color band. 
+
+`expAB_u`, `expAB_g`, `expAB_r`, `expAB_i`, `expAB_z`: the exponential model defined on the AB axis ratio in five color band. 
+
 
 ```{r}
 # Extract the magnitudes of color bands u,g,r,i,z we will use to classify galaxies into pairs
@@ -191,8 +221,9 @@ for(d in sort(unique(dat_small$redShiftLabel))) {
 }
 ```
 
-Now that we have found the clustering based on the redshift and normalized (w.r.t magnitude of u) and magnitude, we will see if these groups have similar pattern in color magnitudes according to barplots of color magnitude
-```{r fig.height = 10, fig.width = 20, echo=FALSE}
+Now that we have found the clustering based on the redshift and normalized (w.r.t magnitude of u) and magnitude, we will see if these groups have similar pattern in color magnitudes according to barplots of color magnitude.
+
+```{r fig.height = 10, fig.width = 20, echo=T}
 # Within groups with similar redshift, we can randomly select groups with the 
 # same color magnitude labeling and plot their color magnitude of u,g,r,i,z 
 par(mfrow = c(ceiling(total.redShiftGroups/3), 3))
@@ -201,13 +232,20 @@ for(d in sort(unique(dat_small$redShiftLabel))){
 	# Randomly select a pair with the same cMag label within the group
 	# with same redshift label, ignore noise group
 	i = i+1
-	cMag.level.random <- sample(unique(cMagGroup[[i]]),1)
-	pairs.row <- which((dat_small$redShiftLabel==d) & (dat_small$cMagLabel == cMag.level.random))
-	sosie <- subset(dat_small[pairs.row,], select=c("c_u","c_g","c_r","c_i","c_z"))
-	sosie <- as.matrix(sosie)
-	matplot(t(sosie), type="l",
-					main = "Magnitude vs. Wavelength",
-					xlab = "Wavelength", ylab = "Magnitude")
+	# not displaying the reshift group with only noise labels
+	if (length(unique(cMagGroup[[i]])) > 1) {
+		# level 0 means noise.
+		# We only display galaxies that are clustered with others (sosie)
+		cMagLabel = unique(cMagGroup[[i]])
+		sosies = cMagLabel[which(cMagLabel != 0)]
+		cMag.level.random <- sample(sosies,1)
+		pairs.row <- which((dat_small$redShiftLabel==d) & (dat_small$cMagLabel == cMag.level.random))
+		sosie <- subset(dat_small[pairs.row,], select=c("c_u","c_g","c_r","c_i","c_z"))
+		sosie <- as.matrix(sosie)
+		matplot(t(sosie), type="l",
+						main = "Magnitude vs. Wavelength",
+						xlab = "Wavelength", ylab = "Magnitude")
+	}
 }
 ```
 
@@ -331,13 +369,20 @@ for(d in sort(unique(dat_small$redShiftLabel))){
 	# Randomly select a pair with the same cMag label within the group
 	# with same redshift label, ignore noise group
 	i = i+1
-	cMag.level.random <- sample(unique(cMagGroup[[i]]),1)
-	pairs.row <- which((dat_small$redShiftLabel==d) & (dat_small$cMagLabel == cMag.level.random))
-	sosie <- subset(dat_small[pairs.row,], select=c("c_u","c_g","c_r","c_i","c_z"))
-	sosie <- as.matrix(sosie)
-	matplot(t(sosie), type="l",
-					main = "Magnitude vs. Wavelength",
-					xlab = "Wavelength", ylab = "Magnitude")
+	# not displaying the reshift group with only noise labels
+	if (length(unique(cMagGroup[[i]])) > 1) {
+		# level 0 means noise.
+		# We only display galaxies that are clustered with others (sosie)
+		cMagLabel = unique(cMagGroup[[i]])
+		sosies = cMagLabel[which(cMagLabel != 0)]
+		cMag.level.random <- sample(sosies,1)
+		pairs.row <- which((dat_small$redShiftLabel==d) & (dat_small$cMagLabel == cMag.level.random))
+		sosie <- subset(dat_small[pairs.row,], select=c("c_u","c_g","c_r","c_i","c_z"))
+		sosie <- as.matrix(sosie)
+		matplot(t(sosie), type="l",
+						main = "Magnitude vs. Wavelength",
+						xlab = "Wavelength", ylab = "Magnitude")
+	}
 }
 
 ```
