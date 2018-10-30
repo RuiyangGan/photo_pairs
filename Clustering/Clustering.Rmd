@@ -3,7 +3,6 @@ title: "Grouping galaxy based on photometric data"
 author: "Ruiyang Gan, Steve Han, Mingwei Huang, Soyoung Lee, Yifan Leng"
 date: "10/17/2018"
 output:
-  html_document: default
   pdf_document: default
 ---
 
@@ -223,7 +222,7 @@ for(d in sort(unique(dat_small$redShiftLabel))) {
 
 Now that we have found the clustering based on the redshift and normalized (w.r.t magnitude of u) and magnitude, we will see if these groups have similar pattern in color magnitudes according to barplots of color magnitude.
 
-```{r fig.height = 10, fig.width = 20, echo=T}
+```{r fig.height = 10, fig.width = 20}
 # Within groups with similar redshift, we can randomly select groups with the 
 # same color magnitude labeling and plot their color magnitude of u,g,r,i,z 
 par(mfrow = c(ceiling(total.redShiftGroups/3), 3))
@@ -327,7 +326,8 @@ cluster_dbscan <- function(data, eps_val){
 }
 
 
-# Extract the magnitudes of color bands u,g,r,i,z we will use to classify galaxies into pairs
+# Extract the magnitudes of color bands u,g,r,i,z 
+# we will use to classify galaxies into pairs
 dat_small.cMag <- subset(dat_small, select=c("c_u","c_g","c_r","c_i","c_z"))
 
 cMagGroup <- sapply(sort(unique(dat_small$redShiftLabel)), function(d) {
@@ -376,7 +376,8 @@ for(d in sort(unique(dat_small$redShiftLabel))){
 		cMagLabel = unique(cMagGroup[[i]])
 		sosies = cMagLabel[which(cMagLabel != 0)]
 		cMag.level.random <- sample(sosies,1)
-		pairs.row <- which((dat_small$redShiftLabel==d) & (dat_small$cMagLabel == cMag.level.random))
+		pairs.row <- which(
+			(dat_small$redShiftLabel==d) & (dat_small$cMagLabel == cMag.level.random))
 		sosie <- subset(dat_small[pairs.row,], select=c("c_u","c_g","c_r","c_i","c_z"))
 		sosie <- as.matrix(sosie)
 		matplot(t(sosie), type="l",

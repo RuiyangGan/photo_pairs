@@ -1,0 +1,55 @@
+---
+title: "Revised_small_scale"
+author: "Ruiayng Gan"
+date: "10/29/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dbscan)
+```
+
+# Prepare the data
+```{r}
+# Read in small scaled data
+dat_small <- read.csv("Photo_pairs.csv", header = TRUE, skip = 1)
+redshift <- dat_small$redshift
+```
+
+
+# Clustering Procedure
+```{r}
+# Use rolling window to obtain subset of galaxies with similar redshift
+# Use window centers evenly spread out through the range of 
+redshift_centers <- seq(from = min(dat_small$redshift),
+												to = max(dat_small$redshift),
+												length.out=11)
+
+# Use normalized composite magnitude
+cMag_bands <- c("c_g", "c_r", "c_i", "c_z")
+cMag_norm <- dat_small[, cMag_bands]/dat_small$c_u
+cMag_scaled <- scale(cMag_norm, center=FALSE)
+
+# Use a bandwidth of 0.5 to select galaxy with similar red shifts
+# at each window center
+h <- 0.5
+
+# Establish a new data frame to  
+pairs <- c()
+
+for(c in redshift_centers) {
+	indx <- (1:length(dat_small))[abs(redshift-c) <= h/2]
+	dat_sub <- dat_small[indx,]
+	# Continue if the subset has more than 1 observatio
+	if (nrow(dat_sub) > 1) {
+		# Use DBSCAN to find pairs based on Normalized Magnitude
+		rslt <- dbscan(cMag_scaled[indx, ], minPts = 2, eps = .05)$cluster
+		# Obtain the pairs which are not classified as noise with their objid
+		# if there is only noise, then skip; otherwise, catalog the pairs with
+		# their ID
+		if(unique())
+	}
+}
+```
+
