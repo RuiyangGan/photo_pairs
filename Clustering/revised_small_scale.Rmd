@@ -69,7 +69,10 @@ redshift_centers <- seq(from = min(dat_small$redshift),
 # Use normalized composite magnitude
 cMag_bands <- c("c_g", "c_r", "c_i", "c_z")
 cMag_norm <- dat_small[, cMag_bands[1:4]]/dat_small$c_u
-cMag_scaled <- scale(cMag_norm, center=FALSE)
+cMag_AB_scaled <- scale(data.frame(cMag_norm, 
+																	 dat_small[,c("deVAB_u","deVAB_g","deVAB_r"
+																	 						 ,"deVAB_i","deVAB_z")]),
+												center=FALSE)
 
 # Use a bandwidth of 0.5 to select galaxy with similar red shifts
 # at each window center
@@ -87,7 +90,7 @@ for(c in redshift_centers) {
 	if (length(indx) > 1) {
 		print(length(indx))
 		# Use DBSCAN to find pairs based on Normalized Magnitude
-		rslt <- dbscan(cMag_norm[indx, ], minPts = 2, eps = .003)$cluster
+		rslt <- dbscan(cMag_AB_scaled[indx, ], minPts = 2, eps = .05)$cluster
 		# if there is only noise, then skip; otherwise, catalog the pairs with
 		# their ID
 		if(length(unique(rslt)) != 1) {
