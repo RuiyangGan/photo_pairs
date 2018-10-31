@@ -1,4 +1,0 @@
-"0","EM <- mclustEM(photo.pairs_sub)
-"
-"2","Error in mclustEM(photo.pairs_sub) : could not find function ""mclustEM""
-"
